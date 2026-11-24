@@ -58,6 +58,15 @@ pub extern "system" fn GetModuleFileNameW(module: *mut c_void, out: *mut u16, si
     })
 }
 
+/// AVX/AVX-512 are hidden from the title: Rosetta 2 on Apple silicon does not emulate them.
+/// The title falls back to its SSE path instead of taking an unsupported instruction.
+pub extern "system" fn IsProcessorFeaturePresent(feature: u32) -> i32 {
+    // PF_AVX_INSTRUCTIONS_AVAILABLE=39, PF_AVX2_INSTRUCTIONS_AVAILABLE=40,
+    // PF_AVX512F_INSTRUCTIONS_AVAILABLE=41.
+    if matches!(feature, 39 | 40 | 41) { return 0; }
+    host::is_processor_feature_present(feature)
+}
+
 /// See [`GetModuleFileNameW`].
 pub extern "system" fn GetModuleFileNameA(module: *mut c_void, out: *mut u8, size: u32) -> u32 {
     let Some(path) = title_path(module) else {
@@ -367,6 +376,7 @@ pub(crate) fn module() -> HleModule {
             hle_export!(GetModuleHandleA),
             hle_export!(GetModuleFileNameW),
             hle_export!(GetModuleFileNameA),
+            hle_export!(IsProcessorFeaturePresent),
             hle_export!(LoadLibraryExA),
             hle_export!(LoadLibraryExW),
             hle_export!(LoadLibraryA),
@@ -427,6 +437,11 @@ mod host {
     pub(super) fn get_module_file_name_w(module: *mut c_void, out: *mut u16, size: u32) -> u32 {
         // SAFETY: see above.
         unsafe { GetModuleFileNameW(module, out, size) }
+    }
+
+    pub(super) fn is_processor_feature_present(feature: u32) -> i32 {
+        // SAFETY: forwards a plain scalar to the host.
+        unsafe { windows_sys::Win32::System::SystemInformation::IsProcessorFeaturePresent(feature) }
     }
 
     pub(super) fn get_module_file_name_a(module: *mut c_void, out: *mut u8, size: u32) -> u32 {

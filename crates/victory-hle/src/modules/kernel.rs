@@ -441,7 +441,7 @@ mod host {
 
     pub(super) fn is_processor_feature_present(feature: u32) -> i32 {
         // SAFETY: forwards a plain scalar to the host.
-        unsafe { windows_sys::Win32::System::SystemInformation::IsProcessorFeaturePresent(feature) }
+        unsafe { windows_sys::Win32::System::Threading::IsProcessorFeaturePresent(feature) }
     }
 
     pub(super) fn get_module_file_name_a(module: *mut c_void, out: *mut u8, size: u32) -> u32 {

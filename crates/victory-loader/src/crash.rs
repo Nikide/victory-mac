@@ -144,11 +144,18 @@ unsafe fn emulate_amd_only(info: *mut EXCEPTION_POINTERS) -> bool {
     unsafe {
         let record = &*(*info).ExceptionRecord;
         let context = &mut *(*info).ContextRecord;
-        if record.ExceptionCode != EXCEPTION_ILLEGAL_INSTRUCTION {
+        if record.ExceptionCode != EXCEPTION_ILLEGAL_INSTRUCTION
+            && record.ExceptionCode != EXCEPTION_BREAKPOINT {
             return false;
         }
         let code = context.Rip as *const u8;
         match code.cast::<[u8; 3]>().read_unaligned() {
+            // CLZERO rewritten to int3 + NOPs for translators that cannot lift it.
+            [0xcc, 0x90, 0x90] => {
+                ((context.Rax & !63) as *mut u8).write_bytes(0, 64);
+                context.Rip += 3;
+                return true;
+            }
             [0x0f, 0x01, 0xfc] => ((context.Rax & !63) as *mut u8).write_bytes(0, 64),
             [0x0f, 0x01, 0xfa] => {}
             [0x0f, 0x01, 0xfb] => std::thread::yield_now(),
